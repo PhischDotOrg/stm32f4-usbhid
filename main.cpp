@@ -17,6 +17,11 @@
 #include <uart/UartAccess.hpp>
 #include <uart/UartDevice.hpp>
 
+/* For USB Device, includes dependent header files. */
+#include <usb/UsbCoreViaSTM32F4.hpp>
+#include <usb/UsbDeviceViaSTM32F4.hpp>
+#include <usb/OutEndpointViaSTM32F4.hpp>
+
 #include <tasks/Heartbeat.hpp>
 #include <tasks/DebounceButton.hpp>
 #include <tasks/ButtonHandler.hpp>
@@ -87,6 +92,41 @@ static uart::UartAccessSTM32F4_Uart6        uart_access(rcc, uart_rx, uart_tx);
 uart::UartDevice                            g_uart(&uart_access);
 
 /*******************************************************************************
+ * USB Device
+ ******************************************************************************/
+/* GPIO Pins for USB Connection */
+static gpio::PinT<decltype(gpio_engine_A)>      usb_pin_dm(&gpio_engine_A, 11);
+static gpio::PinT<decltype(gpio_engine_A)>      usb_pin_dp(&gpio_engine_A, 12);
+static gpio::PinT<decltype(gpio_engine_A)>      usb_pin_vbus(&gpio_engine_A, 9);
+static gpio::PinT<decltype(gpio_engine_A)>      usb_pin_id(&gpio_engine_A, 10);
+
+/* USB Descriptors (defined in UsbDescriptors.cpp) */
+extern const ::usb::UsbDeviceDescriptor_t usbDeviceDescriptor;
+extern const ::usb::UsbStringDescriptors_t usbStringDescriptors;
+extern const ::usb::UsbConfigurationDescriptor_t usbConfigurationDescriptor;
+
+/* USB Stack */
+usb::stm32f4::UsbFullSpeedCore                  usbCore(nvic, rcc, usb_pin_dm, usb_pin_dp, usb_pin_vbus, usb_pin_id, /* p_rxFifoSzInWords = */ 256);
+static usb::stm32f4::UsbDeviceViaSTM32F4        usbHwDevice(usbCore);
+static usb::stm32f4::CtrlInEndpointViaSTM32F4   defaultHwCtrlInEndpoint(usbHwDevice, /* p_fifoSzInWords = */ 0x20);
+
+static usb::stm32f4::IrqInEndpointViaSTM32F4    irqInHwEndp(usbHwDevice, /* p_fifoSzInWords = */ 128, 1);
+static usb::UsbIrqInEndpoint                    irqInEndpoint(irqInHwEndp);
+
+static usb::UsbHidInterface                     usbInterface(irqInEndpoint);
+
+static usb::UsbConfiguration                    usbConfiguration(usbInterface, usbConfigurationDescriptor);
+
+static usb::UsbDevice                           genericUsbDevice(usbHwDevice, usbDeviceDescriptor, usbStringDescriptors, { &usbConfiguration });
+
+static usb::UsbCtrlInEndpoint                   ctrlInEndp(defaultHwCtrlInEndpoint);
+static usb::UsbControlPipe                      defaultCtrlPipe(genericUsbDevice, ctrlInEndp);
+
+static usb::UsbCtrlOutEndpointT<usb::stm32f4::CtrlOutEndpointViaSTM32F4>
+                                                ctrlOutEndp(defaultCtrlPipe);                                               
+static usb::stm32f4::CtrlOutEndpointViaSTM32F4  defaultCtrlOutEndpoint(usbHwDevice, ctrlOutEndp);
+
+/*******************************************************************************
  * Button(s)
  ******************************************************************************/
 static gpio::PinT<decltype(gpio_engine_A)>  g_btn_blue(&gpio_engine_A, 0);
@@ -96,7 +136,7 @@ static gpio::PinT<decltype(gpio_engine_A)>  g_btn_blue(&gpio_engine_A, 0);
  ******************************************************************************/
 static tasks::DebounceButtonT<decltype(g_btn_blue)>                     btn_debounce("btn_debc", /* p_priority */ 1, /* p_periodMs */ 1, g_btn_blue);
 static tasks::HeartbeatT<decltype(g_uart), decltype(g_led_green)>       heartbeat_gn("hrtbt_gn", g_uart, g_led_green, /* p_priority */ 2, /* p_periodMs */ 500);
-static tasks::ButtonHandler                                             btn_handler("btn_hndl", /* p_priority */ 3, g_led_blue);
+static tasks::ButtonHandler                                             btn_handler("btn_hndl", /* p_priority */ 3,  irqInEndpoint, g_led_blue);
 
 /*******************************************************************************
  * Queues for Task Communication
@@ -154,6 +194,8 @@ main(void) {
         goto bad;
     }
 
+    usbHwDevice.start();
+
     buttonHandlerQueue = xQueueCreate(2, sizeof(bool));
     if (buttonHandlerQueue == nullptr) {
         g_uart.printf("Failed to create Button Debouncer <-> Buttone Handler Queue\r\n");
@@ -167,7 +209,13 @@ main(void) {
     vTaskStartScheduler();
 #endif /* defined(HOSTBUILD) */
 
+    usbHwDevice.stop();
+
 bad:
+    if (buttonHandlerQueue != nullptr) {
+        vQueueDelete(buttonHandlerQueue);
+    }
+
     g_led_red.set(gpio::Pin::On);
     g_uart.printf("FATAL ERROR!\r\n");
     while (1) ;

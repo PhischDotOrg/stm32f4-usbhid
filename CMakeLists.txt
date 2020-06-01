@@ -28,9 +28,13 @@ set(PROJECT_NAME    ${CMAKE_PROJECT_NAME}) # FIXME This is redundant
 set(TARGET_NAME     firmware)
 set(TARGET_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/UsbDescriptors.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/common/stm32f4/usb/UsbIrqViaSTM32F4.cpp
 )
 
 set(STM32F4_BOARD   STM32F4_Discovery   CACHE STRING "STM32F4 Board Type")
+
+add_definitions("-DUSB_DEBUG")
 
 ###############################################################################
 # Include a common CMake File that contains the stuff which would normally go
