@@ -18,6 +18,8 @@
 #include <uart/UartDevice.hpp>
 
 #include <tasks/Heartbeat.hpp>
+#include <tasks/DebounceButton.hpp>
+#include <tasks/ButtonHandler.hpp>
 
 /*******************************************************************************
  *
@@ -85,9 +87,21 @@ static uart::UartAccessSTM32F4_Uart6        uart_access(rcc, uart_rx, uart_tx);
 uart::UartDevice                            g_uart(&uart_access);
 
 /*******************************************************************************
+ * Button(s)
+ ******************************************************************************/
+static gpio::PinT<decltype(gpio_engine_A)>  g_btn_blue(&gpio_engine_A, 0);
+
+/*******************************************************************************
  * Tasks
  ******************************************************************************/
-static tasks::HeartbeatT<decltype(g_uart), decltype(g_led_green)>       heartbeat_gn("hrtbt_g", g_uart, g_led_green, 3, 1000);
+static tasks::DebounceButtonT<decltype(g_btn_blue)>                     btn_debounce("btn_debc", /* p_priority */ 1, /* p_periodMs */ 1, g_btn_blue);
+static tasks::HeartbeatT<decltype(g_uart), decltype(g_led_green)>       heartbeat_gn("hrtbt_gn", g_uart, g_led_green, /* p_priority */ 2, /* p_periodMs */ 500);
+static tasks::ButtonHandler                                             btn_handler("btn_hndl", /* p_priority */ 3, g_led_blue);
+
+/*******************************************************************************
+ * Queues for Task Communication
+ ******************************************************************************/
+static QueueHandle_t    buttonHandlerQueue;
 
 /*******************************************************************************
  *
@@ -96,12 +110,18 @@ static tasks::HeartbeatT<decltype(g_uart), decltype(g_led_green)>       heartbea
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+#if defined(HOSTBUILD)
+int
+#else
 void
+#endif /* defined(HOSTBUILD) */
 main(void) {
     g_led_green.enable(gpio::GpioAccessViaSTM32F4::e_Output, gpio::GpioAccessViaSTM32F4::e_None, gpio::GpioAccessViaSTM32F4::e_Gpio);
     g_led_orange.enable(gpio::GpioAccessViaSTM32F4::e_Output, gpio::GpioAccessViaSTM32F4::e_None, gpio::GpioAccessViaSTM32F4::e_Gpio);
     g_led_red.enable(gpio::GpioAccessViaSTM32F4::e_Output, gpio::GpioAccessViaSTM32F4::e_None, gpio::GpioAccessViaSTM32F4::e_Gpio);
     g_led_blue.enable(gpio::GpioAccessViaSTM32F4::e_Output, gpio::GpioAccessViaSTM32F4::e_None, gpio::GpioAccessViaSTM32F4::e_Gpio);
+
+    g_btn_blue.enable(gpio::GpioAccessViaSTM32F4::e_Input, gpio::GpioAccessViaSTM32F4::e_None, gpio::GpioAccessViaSTM32F4::e_Gpio);
 
     g_uart.printf("Copyright (c) 2013-2020 Philip Schulz <phs@phisch.org>\r\n");
     g_uart.printf("All rights reserved.\r\n");
@@ -134,13 +154,27 @@ main(void) {
         goto bad;
     }
 
+    buttonHandlerQueue = xQueueCreate(2, sizeof(bool));
+    if (buttonHandlerQueue == nullptr) {
+        g_uart.printf("Failed to create Button Debouncer <-> Buttone Handler Queue\r\n");
+        goto bad;
+    }
+    btn_debounce.setTxQueue(buttonHandlerQueue);
+    btn_handler.setRxQueue(buttonHandlerQueue);
+
     g_uart.printf("Starting FreeRTOS Scheduler...\r\n");
+#if !defined(HOSTBUILD)
     vTaskStartScheduler();
+#endif /* defined(HOSTBUILD) */
 
 bad:
     g_led_red.set(gpio::Pin::On);
     g_uart.printf("FATAL ERROR!\r\n");
     while (1) ;
+
+#if defined(HOSTBUILD)
+    return (0);
+#endif /* defined(HOSTBUILD) */
 }
 
 #if defined(__cplusplus)
