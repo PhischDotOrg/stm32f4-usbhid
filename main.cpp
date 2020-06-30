@@ -87,10 +87,7 @@ uart::UartDevice                            g_uart(&uart_access);
 /*******************************************************************************
  * Tasks
  ******************************************************************************/
-static tasks::HeartbeatT<decltype(g_uart), decltype(g_led_blue)>        heartbeat_bl("hrtbt_b", g_uart, g_led_blue, 4, 4000);
-static tasks::HeartbeatT<decltype(g_uart), decltype(g_led_green)>       heartbeat_gn("hrtbt_g", g_uart, g_led_green, 3, 2000);
-static tasks::HeartbeatT<decltype(g_uart), decltype(g_led_orange)>      heartbeat_or("hrtbt_o", g_uart, g_led_orange, 2, 1000);
-static tasks::HeartbeatT<decltype(g_uart), decltype(g_led_red)>         heartbeat_rd("hrtbt_r", g_uart, g_led_red, 1, 500);
+static tasks::HeartbeatT<decltype(g_uart), decltype(g_led_green)>       heartbeat_gn("hrtbt_g", g_uart, g_led_green, 3, 1000);
 
 /*******************************************************************************
  *
@@ -106,7 +103,7 @@ main(void) {
     g_led_red.enable(gpio::GpioAccessViaSTM32F4::e_Output, gpio::GpioAccessViaSTM32F4::e_None, gpio::GpioAccessViaSTM32F4::e_Gpio);
     g_led_blue.enable(gpio::GpioAccessViaSTM32F4::e_Output, gpio::GpioAccessViaSTM32F4::e_None, gpio::GpioAccessViaSTM32F4::e_Gpio);
 
-    g_uart.printf("Copyright (c) 2013-2017, 2020 Philip Schulz <phs@phisch.org>\r\n");
+    g_uart.printf("Copyright (c) 2013-2020 Philip Schulz <phs@phisch.org>\r\n");
     g_uart.printf("All rights reserved.\r\n");
     g_uart.printf("\r\n");
     g_uart.printf("SW Version: %s\r\n", gSwVersionId);
