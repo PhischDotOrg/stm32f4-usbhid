@@ -1,0 +1,6 @@
+[submodule ".vscode"]
+	path = .vscode
+	url = https://github.com/PhischDotOrg/stm32f4-vscode.git
+[submodule "common"]
+	path = common
+	url = https://github.com/PhischDotOrg/stm32f4-common.git

@@ -1,0 +1,10 @@
+build/
+nbproject/
+.vs/
+*.swp
+
+*.srctrlbm
+*.srctrldb
+
+.DS_Store
+
