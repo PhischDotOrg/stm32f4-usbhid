@@ -47,7 +47,7 @@ extern const ::usb::UsbStringDescriptors_t usbStringDescriptors __attribute__((a
  * 
  * This is the Example HID Report Descriptor for a Mouse from the USB HID 1.11 Specification, Appendix E.10.
  */
-static uint8_t hidMouseReportDescriptor[50] = {
+extern const uint8_t hidMouseReportDescriptor[50] __attribute__((aligned(4), section(".fixeddata"))) = {
     0x05,   0x01,
     0x09,   0x02,
     0xA1,   0x01,

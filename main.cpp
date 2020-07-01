@@ -104,6 +104,7 @@ static gpio::PinT<decltype(gpio_engine_A)>      usb_pin_id(&gpio_engine_A, 10);
 extern const ::usb::UsbDeviceDescriptor_t usbDeviceDescriptor;
 extern const ::usb::UsbStringDescriptors_t usbStringDescriptors;
 extern const ::usb::UsbConfigurationDescriptor_t usbConfigurationDescriptor;
+extern const uint8_t hidMouseReportDescriptor[50];
 
 /* USB Stack */
 usb::stm32f4::UsbFullSpeedCore                  usbCore(nvic, rcc, usb_pin_dm, usb_pin_dp, usb_pin_vbus, usb_pin_id, /* p_rxFifoSzInWords = */ 256);
@@ -113,7 +114,7 @@ static usb::stm32f4::CtrlInEndpointViaSTM32F4   defaultHwCtrlInEndpoint(usbHwDev
 static usb::stm32f4::IrqInEndpointViaSTM32F4    irqInHwEndp(usbHwDevice, /* p_fifoSzInWords = */ 128, 1);
 static usb::UsbIrqInEndpoint                    irqInEndpoint(irqInHwEndp);
 
-static usb::UsbHidInterface                     usbInterface(irqInEndpoint);
+static usb::UsbHidInterface                     usbInterface(irqInEndpoint, hidMouseReportDescriptor, sizeof(hidMouseReportDescriptor));
 
 static usb::UsbConfiguration                    usbConfiguration(usbInterface, usbConfigurationDescriptor);
 
