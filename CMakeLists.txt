@@ -34,7 +34,7 @@ set(TARGET_SRC
 
 set(STM32F4_BOARD   STM32F4_Discovery   CACHE STRING "STM32F4 Board Type")
 
-add_definitions("-DUSB_DEBUG")
+# add_definitions("-DUSB_DEBUG")
 
 ###############################################################################
 # Include a common CMake File that contains the stuff which would normally go

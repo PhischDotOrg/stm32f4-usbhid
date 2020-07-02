@@ -24,7 +24,7 @@
 
 #include <tasks/Heartbeat.hpp>
 #include <tasks/DebounceButton.hpp>
-#include <tasks/ButtonHandler.hpp>
+#include <tasks/UsbMouse.hpp>
 
 /*******************************************************************************
  *
@@ -127,6 +127,8 @@ static usb::UsbCtrlOutEndpointT<usb::stm32f4::CtrlOutEndpointViaSTM32F4>
                                                 ctrlOutEndp(defaultCtrlPipe);                                               
 static usb::stm32f4::CtrlOutEndpointViaSTM32F4  defaultCtrlOutEndpoint(usbHwDevice, ctrlOutEndp);
 
+static usb::UsbMouseApplication                 usbMouseApplication(irqInEndpoint);
+
 /*******************************************************************************
  * Button(s)
  ******************************************************************************/
@@ -137,12 +139,14 @@ static gpio::PinT<decltype(gpio_engine_A)>  g_btn_blue(&gpio_engine_A, 0);
  ******************************************************************************/
 static tasks::DebounceButtonT<decltype(g_btn_blue)>                     btn_debounce("btn_debc", /* p_priority */ 1, /* p_periodMs */ 1, g_btn_blue);
 static tasks::HeartbeatT<decltype(g_uart), decltype(g_led_green)>       heartbeat_gn("hrtbt_gn", g_uart, g_led_green, /* p_priority */ 2, /* p_periodMs */ 500);
-static tasks::ButtonHandler                                             btn_handler("btn_hndl", /* p_priority */ 3,  irqInEndpoint, g_led_blue);
+static tasks::UsbMouseButtonHandler                                     usb_btn("usb_btn", /* p_priority */ 3,  usbMouseApplication, g_led_blue);
+static tasks::UsbMouseMover                                             usb_move("usb_move", /* p_priority */ 4, /* p_periodMs */ 30 * 1000, usbMouseApplication, 100, 100, g_led_orange);
 
 /*******************************************************************************
  * Queues for Task Communication
  ******************************************************************************/
-static QueueHandle_t    buttonHandlerQueue;
+static QueueHandle_t        buttonHandlerQueue;
+static SemaphoreHandle_t    usbMutex;
 
 /*******************************************************************************
  *
@@ -199,11 +203,19 @@ main(void) {
 
     buttonHandlerQueue = xQueueCreate(2, sizeof(bool));
     if (buttonHandlerQueue == nullptr) {
-        g_uart.printf("Failed to create Button Debouncer <-> Buttone Handler Queue\r\n");
+        g_uart.printf("Failed to create Button Debouncer <-> Buttone Handler Queue!\r\n");
         goto bad;
     }
     btn_debounce.setTxQueue(buttonHandlerQueue);
-    btn_handler.setRxQueue(buttonHandlerQueue);
+    usb_btn.setRxQueue(buttonHandlerQueue);
+
+    usbMutex = xSemaphoreCreateMutex();
+    if (usbMutex == nullptr) {
+        g_uart.printf("Failed to create USB Mutex!\r\n");
+        goto bad;
+    }
+    usb_btn.setUsbMutex(usbMutex);
+    usb_move.setUsbMutex(usbMutex);
 
     g_uart.printf("Starting FreeRTOS Scheduler...\r\n");
 #if !defined(HOSTBUILD)
@@ -215,6 +227,10 @@ main(void) {
 bad:
     if (buttonHandlerQueue != nullptr) {
         vQueueDelete(buttonHandlerQueue);
+    }
+
+    if (usbMutex != nullptr) {
+        vSemaphoreDelete(usbMutex);
     }
 
     g_led_red.set(gpio::Pin::On);
