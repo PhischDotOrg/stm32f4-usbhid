@@ -32,7 +32,7 @@ set(TARGET_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/common/stm32f4/usb/UsbIrqViaSTM32F4.cpp
 )
 
-set(STM32F4_BOARD   STM32F4_Discovery   CACHE STRING "STM32F4 Board Type")
+set(STM32F4_BOARD   STM32F4_Nucleo_F411RE   CACHE STRING "STM32F4 Board Type")
 
 # add_definitions("-DUSB_DEBUG")
 
